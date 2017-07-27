@@ -12,4 +12,6 @@ Just run ``make``
 
 ## Usage
 
-    uc-fontgen /path/to/font > bitmap.c
+    uc-fontgen [-d|-h] /path/to/font > bitmap.c
+
+If -d is provided, ASCII images of each character will be printed to stderr.
