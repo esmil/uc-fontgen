@@ -19,17 +19,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <unistd.h>
 
 #include <freetype/ftbitmap.h>
 
-#ifdef NDEBUG
-#define debug(...) do {} while(0)
-#else
-#define debug(...) printf(__VA_ARGS__)
-#endif
-
 #define CHAR_FIRST 32
 #define CHAR_LAST  126
+
+static bool debug;
 
 static FT_Error
 render_character(FT_Library library, FT_Face face, FT_Bitmap *bm, unsigned int ch)
@@ -49,7 +47,7 @@ render_character(FT_Library library, FT_Face face, FT_Bitmap *bm, unsigned int c
 
 	err = FT_Render_Glyph(slot, FT_RENDER_MODE_MONO);
 	if (err) {
-		fprintf( stderr, "warning: failed FT_Render_Glyph 0x%x %d\n", ch, err);
+		fprintf(stderr, "warning: failed FT_Render_Glyph 0x%x %d\n", ch, err);
 		return err;
 	}
 
@@ -61,9 +59,11 @@ render_character(FT_Library library, FT_Face face, FT_Bitmap *bm, unsigned int c
 
 	memset(line, 0, sizeof(line));
 
-	debug("+--------+\n");
+	if (debug)
+		fprintf(stderr, "+--------+\n");
 	for (y = 0, mask = 1; y < 8; y++, mask <<= 1) {
-		debug("|");
+		if (debug)
+			fprintf(stderr, "|");
 		for (x = 0; x < 8; x++) {
 			unsigned int i = x - slot->bitmap_left;
 			unsigned int j = y - (7 - slot->bitmap_top);
@@ -76,29 +76,42 @@ render_character(FT_Library library, FT_Face face, FT_Bitmap *bm, unsigned int c
 
 			if (v) {
 				line[x] |= mask;
-				debug("#");
-			} else
-				debug(" ");
+				if (debug)
+					fprintf(stderr, "#");
+			} else if (debug)
+				fprintf(stderr, " ");
 		}
-		debug("|\n");
+		if (debug)
+			fprintf(stderr, "|\n");
 	}
-	debug("+--------+\n");
+	if (debug)
+		fprintf(stderr, "+--------+\n");
 
 	printf("\t{ 0x%02hhx, 0x%02hhx, 0x%02hhx, 0x%02hhx,"
 	          " 0x%02hhx, 0x%02hhx, 0x%02hhx, 0x%02hhx }, /* U+%04x",
-		line[0], line[1], line[2], line[3],
-		line[4], line[5], line[6], line[7], ch);
+			line[0], line[1], line[2], line[3],
+			line[4], line[5], line[6], line[7], ch);
 
-		if (ch == 32)
-			printf(" (space)");
-		else if (ch > 32 && ch < 127)
-			printf(" (%c)", ch);
-		else if (ch == 127)
-			printf(" (del)");
+	if (ch == 32)
+		printf(" (space)");
+	else if (ch > 32 && ch < 127)
+		printf(" (%c)", ch);
+	else if (ch == 127)
+		printf(" (del)");
 
-		printf(" */\n");
+	printf(" */\n");
 
 	return 0;
+}
+
+static int
+usage(const char *self, int ret)
+{
+	FILE *out = (ret == EXIT_SUCCESS) ? stdout : stderr;
+
+	fprintf(out, "usage: %s [-d|-h] <font file>\n", self);
+
+	return ret;
 }
 
 int
@@ -110,12 +123,24 @@ main(int argc, char *argv[])
 	FT_Error err;
 	char *filename;
 	unsigned int ch;
+	int opt;
 
-	if (argc < 2) {
-		fprintf(stderr, "usage: %s <font file>\n", argv[0]);
-		return EXIT_FAILURE;
+	while ((opt = getopt(argc, argv, "dh")) != -1) {
+		switch (opt) {
+		case 'd':
+			debug = true;
+			break;
+		case 'h':
+			return usage(argv[0], EXIT_SUCCESS);
+		default: /* '?' */
+			return usage(argv[0], EXIT_FAILURE);
+		}
 	}
-	filename = argv[1];
+
+	if (optind >= argc)
+		return usage(argv[0], EXIT_FAILURE);
+
+	filename = argv[optind];
 
 	err = FT_Init_FreeType(&library);
 	if (err) {

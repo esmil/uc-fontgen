@@ -27,14 +27,10 @@ RM_F      = rm -f
 
 .PHONY: all debug clean
 
-all: CPPFLAGS += -DNDEBUG
 all: $(NAME)
-
-debug: $(NAME)
 
 $(NAME): $(NAME).c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $^ $(LIBS)
-
 
 clean:
 	$(RM_F) $(NAME)
